@@ -111,10 +111,12 @@ var clientsMu sync.Mutex
 var wssStopCh chan struct{}
 var wssStopMu sync.Mutex
 
-const (
-	TakerFeeRate = 0.0005
-	TPThreshold  = 0.15
-	SLThreshold  = -0.05
+const TakerFeeRate = 0.0005
+
+// 止盈止损阈值（基于保证金回报率，运行时可调）
+var (
+	TPThreshold = 0.15  // 默认止盈 15%
+	SLThreshold = -0.05 // 默认止损 -5%
 )
 
 // ----------------- Core Logic -----------------
@@ -286,20 +288,38 @@ func riskMonitor() {
 		state.Lock()
 		symbols := make([]string, 0, len(state.Positions))
 		for _, p := range state.Positions {
-			symbols = append(symbols, fmt.Sprintf("%s(%s PnL:$%.2f)", p.Symbol, p.Side, p.PnL))
+			symbols = append(symbols, fmt.Sprintf("%s(%s PnL:$%.2f/%.1f%%)", p.Symbol, p.Side, p.PnL, p.PnLPct*100))
 		}
 		if len(symbols) > 0 {
-			log.Printf("🔍 风控扫描 | 活跃仓位 %d 个: %s", len(symbols), strings.Join(symbols, " | "))
+			log.Printf("🔍 风控扫描 | TP:%.0f%% SL:%.0f%% | 活跃仓位 %d 个: %s",
+				TPThreshold*100, SLThreshold*100, len(symbols), strings.Join(symbols, " | "))
 		} else {
 			log.Printf("🔍 风控扫描 | 暂无持仓，监控 BTC/ETH/SOL 行情中")
 		}
+
+		// 止盈止损检查
+		for i := len(state.Positions) - 1; i >= 0; i-- {
+			p := state.Positions[i]
+			if p.Margin <= 0 { continue }
+			pnlPct := p.PnL / p.Margin
+			if pnlPct >= TPThreshold {
+				log.Printf("🎯 止盈触发 | %s %s | PnL: $%.2f (%.1f%%) >= TP %.0f%%",
+					p.Symbol, p.Side, p.PnL, pnlPct*100, TPThreshold*100)
+				closePositionLocked(i, fmt.Sprintf("止盈 %.1f%%", pnlPct*100))
+			} else if pnlPct <= SLThreshold {
+				log.Printf("🛑 止损触发 | %s %s | PnL: $%.2f (%.1f%%) <= SL %.0f%%",
+					p.Symbol, p.Side, p.PnL, pnlPct*100, SLThreshold*100)
+				closePositionLocked(i, fmt.Sprintf("止损 %.1f%%", pnlPct*100))
+			}
+		}
+
 		state.ActiveSignals = append(state.ActiveSignals, Signal{
 			ID:        fmt.Sprintf("SCAN-%d", time.Now().Unix()),
 			Type:      "STRATEGY_SCAN",
 			Asset:     "ALL",
 			Direction: "SCANNING",
 			Strength:  50,
-			Message:   fmt.Sprintf("Alpha 策略集群扫描中... 活跃仓位: %d", len(state.Positions)),
+			Message:   fmt.Sprintf("Alpha 策略集群扫描中... 活跃仓位: %d | TP:%.0f%% SL:%.0f%%", len(state.Positions), TPThreshold*100, SLThreshold*100),
 			Timestamp: time.Now().Unix(),
 		})
 		if len(state.ActiveSignals) > 50 {
@@ -472,6 +492,30 @@ func main() {
 		closePositionLocked(req.Index, req.Reason)
 		state.Unlock()
 		w.Write([]byte(`{"status":"success"}`))
+	})
+
+	http.HandleFunc("/api/v1/tpsl", func(w http.ResponseWriter, r *http.Request) {
+		corsHeaders(w)
+		if r.Method == "OPTIONS" { return }
+		var req struct {
+			TP float64 `json:"tp"`
+			SL float64 `json:"sl"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json", 400); return
+		}
+		if req.TP <= 0 || req.SL >= 0 {
+			http.Error(w, "tp 必须 > 0，sl 必须 < 0", 400); return
+		}
+		TPThreshold = req.TP
+		SLThreshold = req.SL
+		log.Printf("⚙️  止盈止损已更新 | TP: %.1f%% | SL: %.1f%%", TPThreshold*100, SLThreshold*100)
+		w.Write([]byte(fmt.Sprintf(`{"status":"success","tp":%.4f,"sl":%.4f}`, TPThreshold, SLThreshold)))
+	})
+
+	http.HandleFunc("/api/v1/tpsl/get", func(w http.ResponseWriter, r *http.Request) {
+		corsHeaders(w)
+		w.Write([]byte(fmt.Sprintf(`{"tp":%.4f,"sl":%.4f}`, TPThreshold, SLThreshold)))
 	})
 
 	log.Println("🚀 Engine Started on :28964")

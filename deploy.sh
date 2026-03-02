@@ -191,11 +191,15 @@ show_menu() {
     echo "  [12] 清空仓位数据"
     echo "  [13] 重置余额为 10000"
     echo ""
+    echo -e "${BOLD}  ── 风控参数 ──────────────────────────${NC}"
+    local tp=$(curl -sf http://127.0.0.1:28964/api/v1/tpsl/get | python3 -c "import json,sys; d=json.load(sys.stdin); print(f\"TP:{d['tp']*100:.1f}% SL:{d['sl']*100:.1f}%\")" 2>/dev/null || echo "TP:15.0% SL:-5.0%")
+    echo "  [14] 修改止盈止损阈值  (当前: $tp)"
+    echo ""
     echo -e "${BOLD}  ── 程序更新 ──────────────────────────${NC}"
-    echo "  [14] 从 GitHub 拉取最新版并重启"
+    echo "  [15] 从 GitHub 拉取最新版并重启"
     echo ""
     echo -e "${BOLD}  ── 其他 ────────────────────────────${NC}"
-    echo "  [15] 卸载（删除所有服务和程序）"
+    echo "  [16] 卸载（删除所有服务和程序）"
     echo ""
     echo "  [0]  退出"
     echo ""
@@ -305,6 +309,22 @@ while true; do
             fi
             ;;
         14)
+            echo -n "  请输入止盈百分比 (当前 TP，如15表示15%): "
+            read -r tp_input
+            echo -n "  请输入止损百分比 (当前 SL，如5表示-5%，输入正数即可): "
+            read -r sl_input
+            tp_val=$(python3 -c "print(float('$tp_input')/100)" 2>/dev/null)
+            sl_val=$(python3 -c "print(-float('$sl_input')/100)" 2>/dev/null)
+            result=$(curl -sf -X POST http://127.0.0.1:28964/api/v1/tpsl \
+                -H "Content-Type: application/json" \
+                -d "{\"tp\":$tp_val,\"sl\":$sl_val}" 2>/dev/null)
+            if echo "$result" | grep -q "success"; then
+                echo -e "${GREEN}✅ 止盈止损已更新 TP:${tp_input}% SL:-${sl_input}%，立即生效${NC}"
+            else
+                echo -e "${RED}❌ 更新失败，请确认引擎正在运行${NC}"
+            fi
+            ;;
+        15)
             echo -e "${CYAN}正在从 GitHub 拉取最新版...${NC}"
             systemctl stop "$SVC_TREND" "$SVC_SQUEEZE" "$SERVICE"
             curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/crypto_dashboard"
@@ -315,7 +335,7 @@ while true; do
             systemctl start "$SERVICE" && sleep 2 && systemctl start "$SVC_TREND" "$SVC_SQUEEZE"
             echo -e "${GREEN}✅ 已更新并重启全部服务${NC}"
             ;;
-        15)
+        16)
             echo -e "${RED}⚠️  此操作将删除所有服务、程序目录和 kuiqian 命令${NC}"
             echo -n "  确认卸载? (yes/N): "
             read -r confirm
