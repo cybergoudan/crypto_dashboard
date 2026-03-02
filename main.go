@@ -402,5 +402,5 @@ func main() {
 	})
 
 	log.Println("🚀 Engine Started on :28964")
-	http.ListenAndServe(":28964", nil)
+	log.Fatal(http.ListenAndServe(":28964", nil))
 }
