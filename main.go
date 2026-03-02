@@ -298,7 +298,7 @@ var db *sql.DB
 
 func initDB() {
 	var err error
-	db, err = sql.Open("sqlite3", "./quant_ledger.db")
+	db, err = sql.Open("sqlite", "./quant_ledger.db")
 	if err != nil { log.Fatal(err) }
 
 	db.Exec(`CREATE TABLE IF NOT EXISTS system_state (id INTEGER PRIMARY KEY CHECK (id = 1), balance REAL, margin_used REAL)`)
