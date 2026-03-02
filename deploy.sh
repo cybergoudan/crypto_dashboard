@@ -1,24 +1,16 @@
 #!/bin/bash
 # ============================================================
 # 币安量化仪表盘 - 一键部署脚本 (Ubuntu)
-# 用法: bash deploy.sh
+# 用法: bash <(curl -fsSL https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main/deploy.sh)
 # ============================================================
 
 set -e
 
-APP_NAME="crypto_dashboard"
 APP_DIR="/opt/crypto_dashboard"
 SERVICE_NAME="crypto_dashboard"
 BINARY="crypto_dashboard"
 PORT=28964
-USER_SHELL_RC=""
-
-# 检测 shell 配置文件
-if [ -f "$HOME/.zshrc" ]; then
-    USER_SHELL_RC="$HOME/.zshrc"
-else
-    USER_SHELL_RC="$HOME/.bashrc"
-fi
+GITHUB_RAW="https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main"
 
 echo ""
 echo "======================================================"
@@ -36,8 +28,7 @@ fi
 echo "📁 创建应用目录 $APP_DIR ..."
 mkdir -p "$APP_DIR"
 
-# 3. 下载程序文件
-GITHUB_RAW="https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main"
+# 3. 从 GitHub 下载程序文件
 echo "📦 下载程序文件..."
 curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/$BINARY"
 curl -fsSL "$GITHUB_RAW/index.html" -o "$APP_DIR/index.html"
@@ -126,7 +117,7 @@ show_menu() {
     echo "  [12] 重置余额为 10000"
     echo ""
     echo -e "${BOLD}  ── 程序更新 ──────────────────────────${NC}"
-    echo "  [13] 上传新版本并重启"
+    echo "  [13] 从 GitHub 拉取最新版并重启"
     echo ""
     echo -e "${BOLD}  ── 其他 ────────────────────────────${NC}"
     echo "  [14] 卸载（删除服务和程序）"
@@ -138,7 +129,7 @@ show_menu() {
 
 db_query() {
     python3 -c "
-import sqlite3, sys
+import sqlite3
 try:
     conn = sqlite3.connect('${APP_DIR}/quant_ledger.db')
     cur = conn.cursor()
@@ -168,6 +159,8 @@ except Exception as e:
     print('DB错误:', e)
 " 2>&1
 }
+
+GITHUB_RAW="https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main"
 
 while true; do
     show_menu
@@ -232,18 +225,13 @@ while true; do
             fi
             ;;
         13)
-            echo -n "  输入新二进制文件路径 (默认: ~/crypto_dashboard): "
-            read -r newbin
-            newbin="${newbin:-$HOME/crypto_dashboard}"
-            if [ -f "$newbin" ]; then
-                systemctl stop "$SERVICE"
-                cp "$newbin" "$APP_DIR/$SERVICE"
-                chmod +x "$APP_DIR/$SERVICE"
-                systemctl start "$SERVICE"
-                echo -e "${GREEN}✅ 已更新并重启${NC}"
-            else
-                echo -e "${RED}❌ 文件不存在: $newbin${NC}"
-            fi
+            echo -e "${CYAN}正在从 GitHub 拉取最新版...${NC}"
+            systemctl stop "$SERVICE"
+            curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/$SERVICE"
+            curl -fsSL "$GITHUB_RAW/index.html" -o "$APP_DIR/index.html"
+            chmod +x "$APP_DIR/$SERVICE"
+            systemctl start "$SERVICE"
+            echo -e "${GREEN}✅ 已更新并重启${NC}"
             ;;
         14)
             echo -e "${RED}⚠️  此操作将删除服务、程序目录和 kuiqian 命令${NC}"
