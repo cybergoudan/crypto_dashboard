@@ -163,6 +163,8 @@ func openPositionLocked(req TradeRequest) error {
 		Timestamp: time.Now().Unix(),
 	})
 	
+	log.Printf("📈 开仓 | %s %s | 数量: %.4f | 价格: %.4f | 保证金: $%.2f | 杠杆: %dx | 手续费: $%.4f | 理由: %s",
+		req.Symbol, req.Side, size, price, req.AmountUSDT, lev, fee, req.Reason)
 	go triggerWSSUpdate()
 	go asyncSaveState()
 	return nil
@@ -196,6 +198,8 @@ func closePositionLocked(idx int, reason string) {
 		Timestamp: time.Now().Unix(),
 	})
 
+	log.Printf("📉 平仓 | %s %s | 开仓价: %.4f | 平仓价: %.4f | 盈亏: $%.2f (%.2f%%) | 手续费: $%.4f | 原因: %s",
+		p.Symbol, p.Side, p.EntryPrice, p.MarkPrice, p.PnL, p.PnLPct*100, fee, reason)
 	state.History = append([]ClosedPosition{cp}, state.History...)
 	state.Positions = append(state.Positions[:idx], state.Positions[idx+1:]...)
 
@@ -265,6 +269,7 @@ func connectBinanceWSS(stopCh chan struct{}) {
 		go connectBinanceWSS(stopCh)
 	}
 
+	log.Printf("📡 WSS 订阅交易对: %v", targets)
 	doneC, _, err := futures.WsCombinedBookTickerServe(targets, wsHandler, errHandler)
 	if err != nil { log.Printf("WSS Fail: %v", err); return }
 
@@ -278,6 +283,15 @@ func riskMonitor() {
 	heartbeat := time.NewTicker(10 * time.Second)
 	for range heartbeat.C {
 		state.Lock()
+		symbols := make([]string, 0, len(state.Positions))
+		for _, p := range state.Positions {
+			symbols = append(symbols, fmt.Sprintf("%s(%s PnL:$%.2f)", p.Symbol, p.Side, p.PnL))
+		}
+		if len(symbols) > 0 {
+			log.Printf("🔍 风控扫描 | 活跃仓位 %d 个: %s", len(symbols), strings.Join(symbols, " | "))
+		} else {
+			log.Printf("🔍 风控扫描 | 暂无持仓，监控 BTC/ETH/SOL 行情中")
+		}
 		state.ActiveSignals = append(state.ActiveSignals, Signal{
 			ID:        fmt.Sprintf("SCAN-%d", time.Now().Unix()),
 			Type:      "STRATEGY_SCAN",
