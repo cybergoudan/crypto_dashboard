@@ -358,7 +358,7 @@
                             <th>标记价格</th>
                             <th>仓位盈亏</th>
                             <th>手续费</th>
-                            <th>预估资金费</th>
+                            <th>资金费</th>
                             <th>总收益</th>
                             <th>操作</th>
                         </tr>
@@ -625,8 +625,8 @@
                         <td style="color:${pnlColor2}; font-weight:bold;" title="未实现盈亏: ${pnlSign2}${fmtMoney.format(p.pnl)} (${(p.pnl_pct * 100).toFixed(2)}%)">${pnlSign2}${fmtMoney.format(p.pnl)}</td>
                         <td style="color:var(--text-muted);" title="开仓手续费: $${fmtMoney.format(openFee)} + 预估平仓费: $${fmtMoney.format(closeFeeEst)}">-$${fmtMoney.format(totalFees)}</td>
                         <td style="color:${totalFunding > 0 ? 'var(--accent-green)' : (totalFunding < 0 ? 'var(--accent-red)' : 'var(--text-muted)')}">
-                            <span title="已结算: ${settledFunding >= 0 ? '+' : ''}${fmtMoney.format(settledFunding)}">${settledFunding !== 0 ? (settledFunding > 0 ? '+' : '') + fmtMoney.format(settledFunding) : '$0.00'}</span>
-                            ${estFunding !== 0 ? `<br><span style="font-size:11px; color:#6b7280;" title="本周期预估（倒计时结束后结算）">预估: ${estFunding > 0 ? '+' : ''}${fmtMoney.format(estFunding)}</span>` : ''}
+                            <span style="font-size:11px; color:#6b7280;" title="下次结算后将计入已收到资金费">预估: ${estFunding > 0 ? '+' : ''}${fmtMoney.format(estFunding)}</span>
+                            <br><span title="已实际收到的资金费（每个结算周期累计）" style="color:${settledFunding > 0 ? 'var(--accent-green)' : (settledFunding < 0 ? 'var(--accent-red)' : 'var(--text-muted)')}">已收: ${settledFunding !== 0 ? (settledFunding > 0 ? '+' : '') + fmtMoney.format(settledFunding) : '$0.00'}</span>
                             <br><span class="funding-countdown" data-symbol="${p.symbol}" style="font-size:11px; color:#6b7280;">${fundingCD}</span>
                         </td>
                         <td style="color:${totalColor}; font-weight:bold;" title="总收益 = 仓位盈亏 + 已结算资金费 + 预估资金费 - 手续费">${totalSign}${fmtMoney.format(totalProfit)}</td>

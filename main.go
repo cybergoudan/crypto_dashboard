@@ -345,7 +345,6 @@ func fundingMonitor() {
 		}
 
 		fc := futures.NewClient("", "")
-		now := time.Now().Unix()
 
 		for _, sym := range syms {
 			res, err := fc.NewPremiumIndexService().Symbol(sym).Do(context.Background())
@@ -362,24 +361,26 @@ func fundingMonitor() {
 				if p.Symbol != sym {
 					continue
 				}
-				// 更新费率和下次结算时间
-				state.Positions[i].FundingRt = fr
-				state.Positions[i].NextFundingTime = nextFunding
 				// 预估资金费 = 仓位价值 × 资金费率（正费率多头付，负费率空头付）
 				posValue := p.Size * p.MarkPrice
+				var estFee float64
 				if p.Side == "LONG" {
-					state.Positions[i].EstimatedFundingFee = -posValue * fr
+					estFee = -posValue * fr
 				} else {
-					state.Positions[i].EstimatedFundingFee = posValue * fr
+					estFee = posValue * fr
 				}
-				// 结算：nextFundingTime 过了且比上次记录的不同（防止重复结算）
-				if nextFunding > 0 && now >= nextFunding && nextFunding != p.NextFundingTime {
-					settled := state.Positions[i].EstimatedFundingFee
-					state.Positions[i].FundingFee += settled
-					state.Balance += settled
+				state.Positions[i].EstimatedFundingFee = estFee
+				// 结算：nextFundingTime 向后推进说明经过了一个结算周期
+				// p.NextFundingTime > 0 防止首次加载（旧值为0）时误结算
+				if p.NextFundingTime > 0 && nextFunding > p.NextFundingTime {
+					state.Positions[i].FundingFee += estFee
+					state.Balance += estFee
 					log.Printf("💸 资金费结算 | %s %s | 费率: %.4f%% | 本次: $%.4f | 累计: $%.4f",
-						sym, p.Side, fr*100, settled, state.Positions[i].FundingFee)
+						sym, p.Side, fr*100, estFee, state.Positions[i].FundingFee)
 				}
+				// 更新费率和下次结算时间（放在结算判断之后，保留旧值用于比较）
+				state.Positions[i].FundingRt = fr
+				state.Positions[i].NextFundingTime = nextFunding
 			}
 			state.Unlock()
 		}
