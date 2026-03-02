@@ -453,6 +453,25 @@
 
         const fmtMoney = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+        // 根据价格大小自动决定精度
+        const fmtPrice = (v) => {
+            const n = parseFloat(v);
+            if (isNaN(n)) return '0.00';
+            if (n >= 100)   return n.toFixed(2);
+            if (n >= 1)     return n.toFixed(4);
+            if (n >= 0.01)  return n.toFixed(6);
+            return n.toFixed(8);
+        };
+
+        // 数量：大数量（山寨币）保留2位，小数量（BTC）保留6位
+        const fmtSize = (v) => {
+            const n = parseFloat(v);
+            if (isNaN(n)) return '0';
+            if (n >= 100)  return n.toFixed(2);
+            if (n >= 1)    return n.toFixed(4);
+            return n.toFixed(6);
+        };
+
         // 资金费结算时间缓存，key=symbol, value={nextFundingTime(ms), fetchedAt(ms)}
         const _fundingTimeCache = {};
         const FUNDING_CACHE_TTL = 5 * 60 * 1000; // 5分钟刷一次
@@ -572,9 +591,6 @@
                     const pnlSign2 = p.pnl >= 0 ? '+' : '';
                     
                     let fmtVal = fmtMoney;
-                    if (p.entry_price < 0.1 || p.mark_price < 0.1) {
-                        fmtVal = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-                    }
                     
                     const openFee = p.open_fee || 0;
                     const closeFeeEst = (p.size * p.mark_price) * 0.0005;
@@ -595,7 +611,7 @@
                     const rowHTML = `
                         <td style="font-weight:bold; cursor:pointer;" onclick="openChart('${p.symbol}', '${p.side}', ${p.entry_price || 0}, ${p.entry_time || 0})">${p.symbol} 📊</td>
                         <td style="color:${sideColor}; font-weight:bold;">${p.side === 'LONG' ? '做多' : '做空'} ${p.leverage > 1 ? `<span style="font-size:10px; padding:2px 4px; background:#374151; color:#fff; border-radius:3px; margin-left:4px;">${p.leverage}X</span>` : ''}</td>
-                        <td>${parseFloat(p.size).toFixed(2)}</td>
+                        <td>${fmtSize(p.size)}</td>
                         <td>$${fmtMoney.format(p.value_usdt)}</td>
                         <td>
                             <div class="progress-wrapper" title="盈亏进度">
@@ -604,8 +620,8 @@
                                 <div class="progress-fill-profit" style="width: ${p.pnl_pct > 0 ? Math.min((p.pnl_pct / 0.15) * 50, 50) : 0}%"></div>
                             </div>
                         </td>
-                        <td>${fmtVal.format(p.entry_price)}</td>
-                        <td>${fmtVal.format(p.mark_price)}</td>
+                        <td>${fmtPrice(p.entry_price)}</td>
+                        <td>${fmtPrice(p.mark_price)}</td>
                         <td style="color:${pnlColor2}; font-weight:bold;" title="未实现盈亏: ${pnlSign2}${fmtMoney.format(p.pnl)} (${(p.pnl_pct * 100).toFixed(2)}%)">${pnlSign2}${fmtMoney.format(p.pnl)}</td>
                         <td style="color:var(--text-muted);" title="开仓手续费: $${fmtMoney.format(openFee)} + 预估平仓费: $${fmtMoney.format(closeFeeEst)}">-$${fmtMoney.format(totalFees)}</td>
                         <td style="color:${totalFunding > 0 ? 'var(--accent-green)' : (totalFunding < 0 ? 'var(--accent-red)' : 'var(--text-muted)')}">
@@ -641,10 +657,6 @@
                                 const sideColor = h.side === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)';
                                 
                                 let fEntry = fmtMoney; let fClose = fmtMoney;
-                                if ((h.entry_price||0) < 0.1 || (h.close_price||0) < 0.1) {
-                                    fEntry = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-                                    fClose = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-                                }
                                 
                                 const dt = new Date((h.close_time || 0) * 1000);
                                 const tH = dt.getHours().toString().padStart(2, '0');
@@ -673,8 +685,8 @@
                                     <tr>
                                         <td style="font-weight:bold; cursor:pointer;" onclick="openChart('${h.symbol || ''}', '${h.side || ''}', ${h.entry_price || 0}, ${h.entry_time || 0}, ${h.close_price || 0}, ${h.close_time || 0})">${timeStr} 📍 ${h.symbol || ''}</td>
                                         <td style="color:${sideColor}; font-weight:bold;">${h.side === 'LONG' ? '做多' : '做空'}</td>
-                                        <td>${fEntry.format(h.entry_price || 0)}</td>
-                                        <td>${fClose.format(h.close_price || 0)}</td>
+                                        <td>${fmtPrice(h.entry_price || 0)}</td>
+                                        <td>${fmtPrice(h.close_price || 0)}</td>
                                         <td style="color:${rawPnlColor}; font-weight:bold;">${rawPnlSign}${fmtMoney.format(h.realized_pnl || 0)}</td>
                                         <td title="${(h.funding_fee||0) === 0 ? "平仓前未经过资金费结算时间，不计入" : "已实际结算的资金费"}">${fundLabel}</td>
                                         <td style="color:var(--text-muted);" title="开仓费: $${fmtMoney.format(h.open_fee||0)}  平仓费: $${fmtMoney.format(h.close_fee||0)}">-$${fmtMoney.format(totalFees)}</td>
