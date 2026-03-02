@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -125,7 +126,7 @@ func openPositionLocked(req TradeRequest) error {
 	price := state.LatestPrices[req.Symbol]
 	if price <= 0 {
 		fc := futures.NewClient("", "")
-		res, err := fc.NewListPricesService().Symbol(req.Symbol).Do(nil)
+		res, err := fc.NewListPricesService().Symbol(req.Symbol).Do(context.Background())
 		if err == nil && len(res) > 0 {
 			price, _ = strconv.ParseFloat(res[0].Price, 64)
 			state.LatestPrices[req.Symbol] = price
