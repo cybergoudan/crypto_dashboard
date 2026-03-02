@@ -36,18 +36,12 @@ fi
 echo "📁 创建应用目录 $APP_DIR ..."
 mkdir -p "$APP_DIR"
 
-# 3. 复制文件
-echo "📦 复制程序文件..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cp "$SCRIPT_DIR/$BINARY" "$APP_DIR/$BINARY"
-cp "$SCRIPT_DIR/index.html" "$APP_DIR/index.html"
+# 3. 下载程序文件
+GITHUB_RAW="https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main"
+echo "📦 下载程序文件..."
+curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/$BINARY"
+curl -fsSL "$GITHUB_RAW/index.html" -o "$APP_DIR/index.html"
 chmod +x "$APP_DIR/$BINARY"
-
-# 如果数据库存在则一并复制
-if [ -f "$SCRIPT_DIR/quant_ledger.db" ]; then
-    cp "$SCRIPT_DIR/quant_ledger.db" "$APP_DIR/quant_ledger.db"
-    echo "📊 已复制数据库文件"
-fi
 
 # 4. 写入 systemd service
 echo "⚙️  配置 systemd 服务..."
