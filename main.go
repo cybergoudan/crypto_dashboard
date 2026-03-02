@@ -311,6 +311,63 @@ func riskMonitor() {
 
 var db *sql.DB
 
+func fundingMonitor() {
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
+		state.RLock()
+		syms := make([]string, 0, len(state.Positions))
+		for _, p := range state.Positions {
+			syms = append(syms, p.Symbol)
+		}
+		state.RUnlock()
+		if len(syms) == 0 {
+			continue
+		}
+
+		fc := futures.NewClient("", "")
+		now := time.Now().Unix()
+
+		for _, sym := range syms {
+			res, err := fc.NewPremiumIndexService().Symbol(sym).Do(context.Background())
+			if err != nil || len(res) == 0 {
+				log.Printf("⚠️ 获取 %s 资金费率失败: %v", sym, err)
+				continue
+			}
+			r := res[0]
+			fr, _ := strconv.ParseFloat(r.LastFundingRate, 64)
+			nextFunding := r.NextFundingTime / 1000 // 毫秒转秒
+
+			state.Lock()
+			for i, p := range state.Positions {
+				if p.Symbol != sym {
+					continue
+				}
+				// 更新费率和下次结算时间
+				state.Positions[i].FundingRt = fr
+				state.Positions[i].NextFundingTime = nextFunding
+				// 预估资金费 = 仓位价值 × 资金费率（正费率多头付，负费率空头付）
+				posValue := p.Size * p.MarkPrice
+				if p.Side == "LONG" {
+					state.Positions[i].EstimatedFundingFee = -posValue * fr
+				} else {
+					state.Positions[i].EstimatedFundingFee = posValue * fr
+				}
+				// 结算：nextFundingTime 过了且比上次记录的不同（防止重复结算）
+				if nextFunding > 0 && now >= nextFunding && nextFunding != p.NextFundingTime {
+					settled := state.Positions[i].EstimatedFundingFee
+					state.Positions[i].FundingFee += settled
+					state.Balance += settled
+					log.Printf("💸 资金费结算 | %s %s | 费率: %.4f%% | 本次: $%.4f | 累计: $%.4f",
+						sym, p.Side, fr*100, settled, state.Positions[i].FundingFee)
+				}
+			}
+			state.Unlock()
+		}
+	}
+}
+
+
+
 func initDB() {
 	var err error
 	db, err = sql.Open("sqlite", "./quant_ledger.db")
@@ -362,6 +419,7 @@ func main() {
 	initDB()
 	triggerWSSUpdate()
 	go riskMonitor()
+	go fundingMonitor()
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
