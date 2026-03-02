@@ -37,13 +37,22 @@ if ! command -v python3 &>/dev/null; then
 fi
 pip3 install requests -q 2>/dev/null || true
 
-# 3. 创建目录
+# 3. 停止已有服务（防止 Text file busy）
+echo "🛑 停止已有服务..."
+systemctl stop crypto_squeeze crypto_trend crypto_dashboard 2>/dev/null || true
+sleep 1
+# 强制杀掉残留进程
+pkill -f "crypto_dashboard" 2>/dev/null || true
+sleep 1
+
+# 4. 创建目录
 echo "📁 创建应用目录 $APP_DIR ..."
 mkdir -p "$APP_DIR"
 
-# 4. 从 GitHub 下载程序文件
+# 5. 从 GitHub 下载程序文件
 echo "📦 下载程序文件..."
-curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/$BINARY"
+curl -fsSL "$GITHUB_RAW/crypto_dashboard" -o "$APP_DIR/${BINARY}.new"
+mv -f "$APP_DIR/${BINARY}.new" "$APP_DIR/$BINARY"
 curl -fsSL "$GITHUB_RAW/index.html" -o "$APP_DIR/index.html"
 curl -fsSL "$GITHUB_RAW/agent_trend_catcher.py" -o "$APP_DIR/agent_trend_catcher.py"
 curl -fsSL "$GITHUB_RAW/agent_squeeze_hunter.py" -o "$APP_DIR/agent_squeeze_hunter.py"
