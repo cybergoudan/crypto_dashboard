@@ -134,6 +134,9 @@ show_menu() {
     echo -e "${BOLD}  ── 程序更新 ──────────────────────────${NC}"
     echo "  [13] 上传新版本并重启"
     echo ""
+    echo -e "${BOLD}  ── 其他 ────────────────────────────${NC}"
+    echo "  [14] 卸载（删除服务和程序）"
+    echo ""
     echo "  [0]  退出"
     echo ""
     echo -n "  请输入选项: "
@@ -246,6 +249,23 @@ while true; do
                 echo -e "${GREEN}✅ 已更新并重启${NC}"
             else
                 echo -e "${RED}❌ 文件不存在: $newbin${NC}"
+            fi
+            ;;
+        14)
+            echo -e "${RED}⚠️  此操作将删除服务、程序目录和 kuiqian 命令${NC}"
+            echo -n "  确认卸载? (yes/N): "
+            read -r confirm
+            if [ "$confirm" = "yes" ]; then
+                systemctl stop "$SERVICE" 2>/dev/null
+                systemctl disable "$SERVICE" 2>/dev/null
+                rm -f /etc/systemd/system/${SERVICE}.service
+                systemctl daemon-reload
+                rm -rf "$APP_DIR"
+                rm -f /usr/local/bin/kuiqian
+                echo -e "${GREEN}✅ 卸载完成${NC}"
+                exit 0
+            else
+                echo "已取消"
             fi
             ;;
         0)
