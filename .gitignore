@@ -1,0 +1,13 @@
+# 编译产物
+crypto_dashboard
+crypto_dashboard.exe
+
+# 数据库（含真实资金数据，不提交）
+*.db
+
+# 日志
+*.log
+
+# 临时文件
+*.orig
+*.patch

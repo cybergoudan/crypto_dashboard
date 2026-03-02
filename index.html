@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Quant Pro Dashboard</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f1015;
+            --panel-bg: #1a1c23;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --border-col: #334155;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #111827;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        .brand { font-size: 20px; font-weight: bold; letter-spacing: 1px; }
+
+        .sys-status {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            align-items: center;
+        }
+
+        .conn-dot {
+            min-width: 8px; height: auto;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            background: var(--bg-surface);
+            display: inline-block;
+            text-align: center;
+        }
+        .conn-dot.active {
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+        }
+
+
+        .ms-indicator {
+            font-family: var(--font-mono);
+            color: var(--accent-blue);
+        }
+
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 350px; /* Sidebar a bit wider */
+            gap: 20px;
+            padding: 20px;
+            width: 100vw;
+            box-sizing: border-box;
+            max-width: none;
+            margin: 0;
+        }
+        
+        /* 表格行悬停效果 */
+        .data-table tbody tr:hover {
+            background-color: rgba(55, 65, 81, 0.4);
+        }
+        
+        .tab-btn {
+            background: transparent;
+            color: #9ca3af;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: #d1d5db;
+            border-bottom: 2px solid var(--accent-blue);
+        }
+.main-container_disabled {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            gap: 15px;
+            padding: 15px;
+            height: calc(100vh - 60px);
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-col);
+            border-radius: 6px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-col);
+            padding-bottom: 10px;
+        }
+
+        /* Portfolio Widget */
+        .portfolio-header {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        .total-value {
+            font-size: 42px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            letter-spacing: -1px;
+        }
+
+        .leverage-badge {
+            background-color: #374151; /* Neutral dark gray */
+            color: #d1d5db; /* Light gray text */
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .pnl-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+        }
+        
+        .val-green { color: var(--accent-green); }
+        .val-gold { color: #f59e0b; font-weight: bold; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 5px;
+            border-bottom: 1px solid #2d3748;
+        }
+        th { color: var(--text-muted); font-weight: normal; }
+
+        .btn-close {
+            background: var(--accent-red);
+            border: none;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-close:hover { background: #b91c1c; }
+
+        /* K线弹窗样式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-col);
+            border-radius: 8px;
+            width: 800px;
+            height: 550px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-col);
+            background: #111827;
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-close {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+        .modal-close:hover { color: #fff; }
+        #tv-chart {
+            flex: 1;
+            width: 100%;
+        }
+        
+        
+        /* K线周期切换栏 */
+        .tf-bar {
+            padding: 10px 20px;
+            background: #1f2937;
+            border-bottom: 1px solid var(--border-col);
+            display: flex;
+            gap: 10px;
+        }
+        .tf-btn {
+            background: transparent; border: 1px solid #374151; color: #9ca3af;
+            padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            transition: all 0.2s;
+        }
+        .tf-btn:hover { background: #374151; color: #fff; }
+        .tf-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+        
+        /* 双边止盈止损进度条 */
+        .progress-wrapper {
+            position: relative;
+            width: 120px;
+            height: 12px;
+            background: #374151; /* Neutral background */
+            border-radius: 6px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .progress-center-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #9ca3af;
+            z-index: 2;
+        }
+        .progress-fill-loss {
+            position: absolute;
+            right: 50%; /* Originates from center moving left */
+            top: 0;
+            bottom: 0;
+            background: var(--accent-red);
+            transition: width 0.3s ease;
+        }
+        .progress-fill-profit {
+            position: absolute;
+            left: 50%; /* Originates from center moving right */
+            top: 0;
+            bottom: 0;
+            background: var(--accent-green);
+            transition: width 0.3s ease;
+        }
+
+        /* 表格行悬停效果 */
+        tbody tr {
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        td button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">全自动亏钱系统</div>
+        <div class="sys-status">
+            <div>WSS : <span class="conn-dot" id="ws-status">连接中...</span></div>
+            <div class="ms-indicator">网络延迟: <span id="current-ping">--</span> ms | 1h均值: <span id="avg-ping">--</span> ms</div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- 主体区域 - 仓位及K线蒙层 -->
+        <div id="chart-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span id="chart-title">---</span>
+                        <span class="leverage-badge" id="chart-subtitle">正在同步币安底层 Tick 数据...</span>
+                    </div>
+                    <div class="modal-close" onclick="closeChart()">✕</div>
+                </div>
+                
+                <div class="tf-bar">
+                    <button class="tf-btn" id="tf-1m" onclick="changeTimeframe('1m')">1分钟</button>
+                    <button class="tf-btn" id="tf-5m" onclick="changeTimeframe('5m')">5分钟</button>
+                    <button class="tf-btn active" id="tf-15m" onclick="changeTimeframe('15m')">15分钟</button>
+                    <button class="tf-btn" id="tf-1h" onclick="changeTimeframe('1h')">1小时</button>
+                    <button class="tf-btn" id="tf-4h" onclick="changeTimeframe('4h')">4小时</button>
+                    <button class="tf-btn" id="tf-1d" onclick="changeTimeframe('1d')">1天</button>
+                    <button class="tf-btn" id="tf-1w" onclick="changeTimeframe('1w')">1周</button>
+                    <button class="tf-btn" id="tf-1M" onclick="changeTimeframe('1M')">1月</button>
+                </div>
+                <div id="tv-chart"></div>
+            </div>
+        </div>
+        
+        <div class="panel" style="display: flex; flex-direction: column;">
+            <div style="display:flex; gap:20px; border-bottom:1px solid #2d3748; margin-bottom: 15px;">
+                <button class="tab-btn active" id="tab-btn-active" onclick="switchTab('active')">活动仓位 / 监控</button>
+                <button class="tab-btn" id="tab-btn-history" onclick="switchTab('history')">📜 历史订单 / 损益复盘</button>
+            </div>
+            
+            <div id="tab-active" style="overflow-y: auto; flex: 1; max-height: 70vh;">
+                <table id="positions-table" class="data-table" style="position: relative;">
+                    <thead style="position: sticky; top: 0; background: var(--bg-surface); z-index: 10;">
+                        <tr>
+                            <th>交易对</th>
+                            <th>方向</th>
+                            <th>大小</th>
+                            <th>价值(USDT)</th>
+                            <th>进度(-5% / +15%)</th>
+                            <th>开仓均价</th>
+                            <th>标记价格</th>
+                            <th>仓位盈亏</th>
+                            <th>手续费</th>
+                            <th>预估资金费</th>
+                            <th>总收益</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-body">
+                        <tr><td colspan="12" style="text-align:center; color:#94a3b8; padding:30px;">[ 当前无活动仓位 ]</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-history" style="overflow-y: auto; flex: 1; display: none; max-height: 70vh;">
+                <table id="history-table" class="data-table" style="position: relative;">
+                    <thead style="position: sticky; top: 0; background: var(--bg-surface); z-index: 10;">
+                        <tr>
+                            <th>平仓时间 (📍图表)</th>
+                            <th>方向</th>
+                            <th>开仓价</th>
+                            <th>平仓价</th>
+                            <th>仓位盈亏</th>
+                            <th>资金费</th>
+                            <th>手续费</th>
+                            <th>净收益</th>
+                            <th>平仓原因</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:30px;">[ 暂无历史数据落盘 ]</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Wallet & Signals -->
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div class="panel" style="flex: 0 0 auto;">
+                <div class="panel-title">核心资产与风险概览</div>
+                <div class="portfolio-header">
+                    <span style="color:var(--text-muted);">账户净值 (USDT) <span class="leverage-badge">1x 全仓杠杆</span></span>
+                    <span class="total-value" id="balance-val">100,000.00</span>
+                </div>
+                <div class="pnl-row">
+                    <span>未实现盈亏:</span>
+                    <span id="upnl-val" class="val-green">+0.00</span>
+                </div>
+                <div class="pnl-row" style="margin-top:8px;">
+                    <span>保证金占用率:</span>
+                    <span id="margin-val">0.00%</span>
+                </div>
+            </div>
+
+            <div class="panel" style="flex: 1 1 auto;">
+                <div class="panel-title">Alpha 策略数据流</div>
+                <div id="signals-log" style="font-size:12px; font-family:var(--font-mono); color:#cbd5e1; display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height: 400px;">
+                    <div style="color:var(--accent-green);">> 系统核心已唤醒. 正在监听币安 WSS...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            if (tabName === 'active') {
+                document.getElementById('tab-active').style.display = 'block';
+                document.getElementById('tab-history').style.display = 'none';
+                document.getElementById('tab-btn-active').classList.add('active');
+                document.getElementById('tab-btn-history').classList.remove('active');
+            } else {
+                document.getElementById('tab-active').style.display = 'none';
+                document.getElementById('tab-history').style.display = 'block';
+                document.getElementById('tab-btn-active').classList.remove('active');
+                document.getElementById('tab-btn-history').classList.add('active');
+            }
+        }
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let wsUrl;
+        if (window.location.port === "28965") {
+            // Keep compatibility with serve6.py on port 28965
+            wsUrl = `${wsProtocol}//${window.location.hostname}:28964/ws`;
+        } else {
+            // Use current host (works for port 28964 OR reverse proxies)
+            wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        }
+
+        console.log("🚀 Attempting WebSocket Connection to:", wsUrl);
+
+        let ws;
+        
+        let chartInstance = null;
+        let candleSeries = null;
+        let currentChartState = {};
+
+        const fmtMoney = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // 资金费结算时间缓存，key=symbol, value={nextFundingTime(ms), fetchedAt(ms)}
+        const _fundingTimeCache = {};
+        const FUNDING_CACHE_TTL = 5 * 60 * 1000; // 5分钟刷一次
+
+        function fetchNextFundingTime(symbol) {
+            const cached = _fundingTimeCache[symbol];
+            if (cached && (Date.now() - cached.fetchedAt) < FUNDING_CACHE_TTL) return;
+            // 标记正在请求，避免并发重复拉取
+            _fundingTimeCache[symbol] = { nextFundingTime: cached ? cached.nextFundingTime : 0, fetchedAt: Date.now() };
+            fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d && d.nextFundingTime) {
+                        _fundingTimeCache[symbol] = { nextFundingTime: d.nextFundingTime, fetchedAt: Date.now() };
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function fmtCountdown(targetMs) {
+            const diff = Math.max(0, targetMs - Date.now());
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            return `(结算倒计时${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')})`;
+        }
+
+        function refreshFundingCountdowns() {
+            document.querySelectorAll('.funding-countdown[data-symbol]').forEach(el => {
+                const sym = el.dataset.symbol;
+                const cached = _fundingTimeCache[sym];
+                if (cached && cached.nextFundingTime > 0) {
+                    el.textContent = fmtCountdown(cached.nextFundingTime);
+                } else {
+                    fetchNextFundingTime(sym);
+                }
+            });
+        }
+
+        setInterval(refreshFundingCountdowns, 1000);
+
+        function connectWS() {
+            console.log("WebSocket connecting to " + wsUrl);
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("WebSocket connected successfully.");
+                document.getElementById('ws-status').classList.add('active');
+                document.getElementById('ws-status').textContent = 'Live';
+                document.getElementById('ws-status').style.background = 'rgba(16, 185, 129, 0.2)';
+                document.getElementById('ws-status').style.color = 'var(--accent-green)';
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket connection error:", error);
+                document.getElementById('ws-status').textContent = 'WS Error: ' + wsUrl;
+                document.getElementById('ws-status').style.background = 'rgba(239, 68, 68, 0.2)';
+                document.getElementById('ws-status').style.color = 'var(--accent-red)';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateDashboard(data);
+                } catch (e) {
+                    console.error("Parse error:", e);
+                }
+            };
+
+            ws.onclose = () => {
+                const badge = document.getElementById('ws-status');
+                badge.classList.remove('active');
+                badge.textContent = 'Offline'; 
+                badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                badge.style.color = 'var(--accent-red)';
+                setTimeout(connectWS, 2000); 
+            };
+        }
+
+        let lastHistoryJSON = "";
+        let lastSignalsJSON = "";
+
+        function updateDashboard(data) {
+            // Metrics Update
+            document.getElementById('current-ping').textContent = data.current_ping_ms;
+            document.getElementById('avg-ping').textContent = data.latency_1h_ms.toFixed(1);
+
+            // Capital Update
+            document.getElementById('balance-val').textContent = fmtMoney.format(data.balance);
+            
+            const upnl = document.getElementById('upnl-val');
+            upnl.textContent = (data.unrealized_pnl >= 0 ? '+' : '') + fmtMoney.format(data.unrealized_pnl);
+            upnl.className = data.unrealized_pnl >= 0 ? 'val-green' : 'val-red';
+            
+            // Calculate accurate Margin Used % based on Unrealized Balance
+            const currentEquity = data.balance + data.unrealized_pnl;
+            const marginRatio = currentEquity > 0 ? (data.margin_used / currentEquity) * 100 : 0;
+            
+            document.getElementById('margin-val').textContent = marginRatio.toFixed(2) + '%';
+            
+            // Render Positions
+            const tbody = document.getElementById('positions-body');
+            if (!data.positions || data.positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#94a3b8; padding:30px;">[ 当前无活动仓位 ]</td></tr>';
+            } else {
+                // 1. 标记活跃 Symbol，清理过期行
+                const activeSymbols = data.positions.map(p => p.symbol);
+                Array.from(tbody.querySelectorAll('tr[data-symbol]')).forEach(row => {
+                    if (!activeSymbols.includes(row.dataset.symbol)) row.remove();
+                });
+                if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
+
+                data.positions.forEach((p, index) => {
+                    const isLong = p.side === 'LONG';
+                    const sideColor = isLong ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const pnlColor2 = p.pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const pnlSign2 = p.pnl >= 0 ? '+' : '';
+                    
+                    let fmtVal = fmtMoney;
+                    if (p.entry_price < 0.1 || p.mark_price < 0.1) {
+                        fmtVal = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+                    }
+                    
+                    const openFee = p.open_fee || 0;
+                    const closeFeeEst = (p.size * p.mark_price) * 0.0005;
+                    const totalFees = openFee + closeFeeEst;
+                    // 已结算资金费 + 当前周期预估资金费（来自后端 SQLite，倒计时归零前实时更新）
+                    const settledFunding = p.funding_fee_paid || 0;
+                    const estFunding = p.estimated_funding_fee || 0;
+                    const totalFunding = settledFunding + estFunding;
+                    const totalProfit = p.pnl + totalFunding - totalFees;
+                    const totalColor = totalProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const totalSign = totalProfit > 0 ? '+' : '';
+
+                    const cachedFunding = _fundingTimeCache[p.symbol];
+                    const fundingCD = (cachedFunding && cachedFunding.nextFundingTime > 0) ? fmtCountdown(cachedFunding.nextFundingTime) : '获取中...';
+
+                    // 2. 复用现有行，避免 DOM 销毁引起的频闪
+                    let row = tbody.querySelector(`tr[data-symbol="${p.symbol}"]`);
+                    const rowHTML = `
+                        <td style="font-weight:bold; cursor:pointer;" onclick="openChart('${p.symbol}', '${p.side}', ${p.entry_price || 0}, ${p.entry_time || 0})">${p.symbol} 📊</td>
+                        <td style="color:${sideColor}; font-weight:bold;">${p.side === 'LONG' ? '做多' : '做空'} ${p.leverage > 1 ? `<span style="font-size:10px; padding:2px 4px; background:#374151; color:#fff; border-radius:3px; margin-left:4px;">${p.leverage}X</span>` : ''}</td>
+                        <td>${parseFloat(p.size).toFixed(2)}</td>
+                        <td>$${fmtMoney.format(p.value_usdt)}</td>
+                        <td>
+                            <div class="progress-wrapper" title="盈亏进度">
+                                <div class="progress-center-line"></div>
+                                <div class="progress-fill-loss" style="width: ${p.pnl_pct < 0 ? Math.min((p.pnl_pct / -0.05) * 50, 50) : 0}%"></div>
+                                <div class="progress-fill-profit" style="width: ${p.pnl_pct > 0 ? Math.min((p.pnl_pct / 0.15) * 50, 50) : 0}%"></div>
+                            </div>
+                        </td>
+                        <td>${fmtVal.format(p.entry_price)}</td>
+                        <td>${fmtVal.format(p.mark_price)}</td>
+                        <td style="color:${pnlColor2}; font-weight:bold;" title="未实现盈亏: ${pnlSign2}${fmtMoney.format(p.pnl)} (${(p.pnl_pct * 100).toFixed(2)}%)">${pnlSign2}${fmtMoney.format(p.pnl)}</td>
+                        <td style="color:var(--text-muted);" title="开仓手续费: $${fmtMoney.format(openFee)} + 预估平仓费: $${fmtMoney.format(closeFeeEst)}">-$${fmtMoney.format(totalFees)}</td>
+                        <td style="color:${totalFunding > 0 ? 'var(--accent-green)' : (totalFunding < 0 ? 'var(--accent-red)' : 'var(--text-muted)')}">
+                            <span title="已结算: ${settledFunding >= 0 ? '+' : ''}${fmtMoney.format(settledFunding)}">${settledFunding !== 0 ? (settledFunding > 0 ? '+' : '') + fmtMoney.format(settledFunding) : '$0.00'}</span>
+                            ${estFunding !== 0 ? `<br><span style="font-size:11px; color:#6b7280;" title="本周期预估（倒计时结束后结算）">预估: ${estFunding > 0 ? '+' : ''}${fmtMoney.format(estFunding)}</span>` : ''}
+                            <br><span class="funding-countdown" data-symbol="${p.symbol}" style="font-size:11px; color:#6b7280;">${fundingCD}</span>
+                        </td>
+                        <td style="color:${totalColor}; font-weight:bold;" title="总收益 = 仓位盈亏 + 已结算资金费 + 预估资金费 - 手续费">${totalSign}${fmtMoney.format(totalProfit)}</td>
+                        <td><button class="btn-close" onclick="event.stopPropagation(); manualClose(${index})">平仓</button></td>
+                    `;
+                    
+                    if (!row) {
+                        row = document.createElement('tr');
+                        row.dataset.symbol = p.symbol;
+                        tbody.appendChild(row);
+                    }
+                    if (row.innerHTML !== rowHTML) row.innerHTML = rowHTML;
+                });
+            }
+
+
+            // Render History Table Safely using data fingerprinting
+            try {
+                const currentHistoryJSON = JSON.stringify(data.history || []);
+                if (currentHistoryJSON !== lastHistoryJSON) {
+                    lastHistoryJSON = currentHistoryJSON;
+                    const hBody = document.getElementById('history-body');
+                    if (hBody) {
+                        if (data.history && data.history.length > 0) {
+                            let historyHTML = '';
+                            data.history.forEach((h) => {
+                                if (!h) return;
+                                const sideColor = h.side === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)';
+                                
+                                let fEntry = fmtMoney; let fClose = fmtMoney;
+                                if ((h.entry_price||0) < 0.1 || (h.close_price||0) < 0.1) {
+                                    fEntry = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+                                    fClose = new Intl.NumberFormat('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+                                }
+                                
+                                const dt = new Date((h.close_time || 0) * 1000);
+                                const tH = dt.getHours().toString().padStart(2, '0');
+                                const tM = dt.getMinutes().toString().padStart(2, '0');
+                                const tS = dt.getSeconds().toString().padStart(2, '0');
+                                const timeStr = tH + ":" + tM + ":" + tS;
+
+                                let displayReason = (h.close_reason || "").toString();
+                                if (displayReason.includes('风控触发') || displayReason.includes('止损止盈') || displayReason.includes('拦截')) {
+                                    displayReason = '✅ 触发止盈/止损网格';
+                                }
+                                displayReason = displayReason.replace(/['"]/g, '');
+
+                                const totalFees = (h.open_fee || 0) + (h.close_fee || 0);
+                                const netProfit = (h.realized_pnl || 0) + (h.funding_fee || 0) - totalFees;
+                                const netColor = netProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                                const netSign = netProfit > 0 ? '+' : '';
+                                const rawPnlColor = (h.realized_pnl || 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                                const rawPnlSign = (h.realized_pnl || 0) > 0 ? '+' : '';
+                                const fundColor = (h.funding_fee || 0) > 0 ? 'var(--accent-green)' : ((h.funding_fee || 0) < 0 ? 'var(--accent-red)' : 'var(--text-muted)');
+                                const fundLabel = (h.funding_fee || 0) === 0
+                                    ? `<span style="color:var(--text-muted);">0.00 <span style="font-size:10px;color:#6b7280;">(未结算)</span></span>`
+                                    : `<span style="color:${fundColor};">${(h.funding_fee||0) > 0 ? '+' : ''}${fmtMoney.format(h.funding_fee||0)}</span>`;
+
+                                historyHTML += `
+                                    <tr>
+                                        <td style="font-weight:bold; cursor:pointer;" onclick="openChart('${h.symbol || ''}', '${h.side || ''}', ${h.entry_price || 0}, ${h.entry_time || 0}, ${h.close_price || 0}, ${h.close_time || 0})">${timeStr} 📍 ${h.symbol || ''}</td>
+                                        <td style="color:${sideColor}; font-weight:bold;">${h.side === 'LONG' ? '做多' : '做空'}</td>
+                                        <td>${fEntry.format(h.entry_price || 0)}</td>
+                                        <td>${fClose.format(h.close_price || 0)}</td>
+                                        <td style="color:${rawPnlColor}; font-weight:bold;">${rawPnlSign}${fmtMoney.format(h.realized_pnl || 0)}</td>
+                                        <td title="${(h.funding_fee||0) === 0 ? "平仓前未经过资金费结算时间，不计入" : "已实际结算的资金费"}">${fundLabel}</td>
+                                        <td style="color:var(--text-muted);" title="开仓费: $${fmtMoney.format(h.open_fee||0)}  平仓费: $${fmtMoney.format(h.close_fee||0)}">-$${fmtMoney.format(totalFees)}</td>
+                                        <td style="color:${netColor}; font-weight:bold;" title="净收益 = 仓位盈亏 + 资金费 - 手续费">${netSign}${fmtMoney.format(netProfit)}</td>
+                                        <td style="max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; color:#9ca3af;" title="${displayReason}">${displayReason}</td>
+                                    </tr>
+                                `;
+                            });
+                            hBody.innerHTML = historyHTML;
+                        } else {
+                            hBody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:30px;">[ 暂无历史数据落盘 ]</td></tr>';
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("History Render Complete Failure:", err);
+            }
+
+            const signalsLog = document.getElementById('signals-log');
+            if (data.active_signals && data.active_signals.length > 0) {
+                const currentSignalsJSON = JSON.stringify(data.active_signals.slice(-50)); // Only track last 50
+                if (currentSignalsJSON !== lastSignalsJSON) {
+                    lastSignalsJSON = currentSignalsJSON;
+                    let signalsHTML = '';
+                    const recent = [...data.active_signals].slice(-50).reverse();
+                    recent.forEach(s => {
+                        const timeStr = new Date(s.timestamp * 1000).toLocaleTimeString();
+                        const dirColor = s.direction === 'LONG' ? 'var(--accent-green)' : (s.direction === 'SHORT' ? 'var(--accent-red)' : '#e2e8f0');
+                        
+                        signalsHTML += `
+                            <div>
+                                <div style="color:var(--text-muted); margin-bottom: 2px;">[${timeStr}] 🎯 [${s.type}] ${s.asset}</div>
+                                <div style="padding-left:10px; border-left:2px solid ${dirColor}; margin-bottom:5px;">
+                                    ${s.message}
+                                    <div style="color:${dirColor}; font-weight:bold; margin-top:3px;">评级: [${s.strength}/100] -> ${s.direction} 警报触发</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    signalsLog.innerHTML = signalsHTML;
+                }
+            }
+        }
+        
+        window.manualClose = function(index) {
+            let apiUrl = window.location.port ?
+                `${window.location.protocol}//${window.location.hostname}:28964/api/v1/close` :
+                `${window.location.protocol}//${window.location.hostname}/api/v1/close`;
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ index: index, reason: "主理人手动强制平仓" })
+            }).then(r => r.json()).then(res => {
+                console.log("手动平仓成功:", res);
+            }).catch(e => console.error("手动平仓错误:", e));
+        }
+
+        // --- TradingView 轻量级图表引擎对接 --- //
+        
+        function closeChart() {
+            document.getElementById('chart-modal').style.display = 'none';
+        }
+
+        
+        function openChart(symbol, side, entryPrice, entryTimeUnix, closePrice, closeTimeUnix) {
+            currentChartState = { symbol, side, entryPrice, entryTimeUnix, closePrice: closePrice || 0, closeTimeUnix: closeTimeUnix || 0, interval: '15m' };
+            document.getElementById('chart-title').innerText = `${symbol} 现货复盘 (15分钟线)`;
+            document.getElementById('chart-modal').style.display = 'flex';
+            
+            const tvContainer = document.getElementById('tv-chart');
+            // Check if chart is already there
+            if (!chartInstance) {
+                chartInstance = LightweightCharts.createChart(tvContainer, {
+                    width: 798,
+                    height: 440,
+                    layout: { background: { type: 'solid', color: '#1a1c23' }, textColor: '#d1d5db' },
+                    grid: { vertLines: { color: '#2d3748' }, horzLines: { color: '#2d3748' } },
+                    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2d3748' },
+                });
+            } else {
+                if (candleSeries) {
+                    chartInstance.removeSeries(candleSeries);
+                }
+                if (window._dotSeries) {
+                    chartInstance.removeSeries(window._dotSeries);
+                }
+                if (window._seriesMarkers) { window._seriesMarkers.setMarkers([]); window._seriesMarkers = null; }
+                if (window._entryPriceLine) { try { candleSeries && candleSeries.removePriceLine(window._entryPriceLine); } catch(e){} window._entryPriceLine = null; }
+                if (window._closePriceLine) { try { candleSeries && candleSeries.removePriceLine(window._closePriceLine); } catch(e){} window._closePriceLine = null; }
+            }
+
+            // Set dynamic price format based on entryPrice to solve cheap altcoin flattening
+            let precision = 2;
+            let minMove = 0.01;
+            if (entryPrice < 0.1) { precision = 6; minMove = 0.000001; }
+            else if (entryPrice < 1) { precision = 4; minMove = 0.0001; }
+            
+            candleSeries = chartInstance.addSeries(LightweightCharts.CandlestickSeries, {
+                upColor: '#22c55e', downColor: '#ef4444', borderVisible: false,
+                wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+                priceFormat: {
+                    type: 'price',
+                    precision: precision,
+                    minMove: minMove,
+                }
+            });
+
+            
+
+            changeTimeframe('15m');
+        }
+
+        function changeTimeframe(interval) {
+            // Update UI buttons
+            document.querySelectorAll('.tf-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById('tf-' + interval);
+            if(activeBtn) activeBtn.classList.add('active');
+            
+            currentChartState.interval = interval;
+            const { symbol, side, entryPrice, entryTimeUnix, closePrice, closeTimeUnix } = currentChartState;
+            
+            document.getElementById('chart-title').innerText = `${symbol} 现货复盘 (${interval}线)`;
+            document.getElementById('chart-subtitle').innerText = "加载历史 K 线及计算标记位...";
+
+            const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=500`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            fetch(url, { signal: controller.signal })
+                .then(r => r.json())
+                .then(klines => {
+                    clearTimeout(timeoutId);
+                    if (!klines.map) {
+                       document.getElementById('chart-subtitle').innerText = "未能找到交易对现货历史...";
+                       return;
+                    }
+
+                    const chartData = klines.map(k => ({
+                        time: Math.floor(k[0] / 1000), 
+                        open: parseFloat(k[1]), 
+                        high: parseFloat(k[2]), 
+                        low: parseFloat(k[3]), 
+                        close: parseFloat(k[4])
+                    }));
+                    
+                    try {
+                         candleSeries.setData(chartData);
+                    } catch (e) {
+                         document.getElementById('chart-subtitle').innerText = "TV引擎渲染数据失败";
+                         console.error("TV Render:", e);
+                         return;
+                    }
+
+                    // --- 核心：在 K 线上砸出买卖标记点 ---
+                    try {
+                        // 清理旧价格线
+                        if (window._entryPriceLine) { try { candleSeries.removePriceLine(window._entryPriceLine); } catch(e){} window._entryPriceLine = null; }
+                        if (window._closePriceLine) { try { candleSeries.removePriceLine(window._closePriceLine); } catch(e){} window._closePriceLine = null; }
+                        if (window._seriesMarkers) { try { window._seriesMarkers.setMarkers([]); } catch(e){} window._seriesMarkers = null; }
+
+                        const markers = [];
+                        const priceFmt = (p) => p < 0.1 ? p.toFixed(6) : p < 1 ? p.toFixed(4) : p.toFixed(2);
+
+                        // 开仓标记
+                        if (entryTimeUnix && entryPrice && !isNaN(entryTimeUnix) && entryTimeUnix > 0) {
+                            let entryDisplayTime = chartData[0].time;
+                            for (let i = 0; i < chartData.length - 1; i++) {
+                                if (entryTimeUnix >= chartData[i].time && entryTimeUnix < chartData[i+1].time) {
+                                    entryDisplayTime = chartData[i].time;
+                                    break;
+                                }
+                                if (i === chartData.length - 2) entryDisplayTime = chartData[chartData.length - 1].time;
+                            }
+                            markers.push({
+                                time: entryDisplayTime,
+                                position: side === 'LONG' ? 'belowBar' : 'aboveBar',
+                                color: side === 'LONG' ? '#22c55e' : '#ef4444',
+                                shape: side === 'LONG' ? 'arrowUp' : 'arrowDown',
+                                text: (side === 'LONG' ? '开多 ' : '开空 ') + priceFmt(entryPrice),
+                                size: 1.5
+                            });
+                            window._entryPriceLine = candleSeries.createPriceLine({
+                                price: entryPrice,
+                                color: side === 'LONG' ? '#22c55e' : '#ef4444',
+                                lineWidth: 1,
+                                lineStyle: 2,
+                                axisLabelVisible: true,
+                                title: '开仓价'
+                            });
+                        }
+
+                        // 平仓标记（仅历史订单传入 closePrice/closeTimeUnix）
+                        if (closePrice && closeTimeUnix && closePrice > 0 && closeTimeUnix > 0) {
+                            let closeDisplayTime = chartData[chartData.length - 1].time;
+                            for (let i = 0; i < chartData.length - 1; i++) {
+                                if (closeTimeUnix >= chartData[i].time && closeTimeUnix < chartData[i+1].time) {
+                                    closeDisplayTime = chartData[i].time;
+                                    break;
+                                }
+                            }
+                            markers.push({
+                                time: closeDisplayTime,
+                                position: side === 'LONG' ? 'aboveBar' : 'belowBar',
+                                color: '#f59e0b',
+                                shape: side === 'LONG' ? 'arrowDown' : 'arrowUp',
+                                text: '平仓 ' + priceFmt(closePrice),
+                                size: 1.5
+                            });
+                            window._closePriceLine = candleSeries.createPriceLine({
+                                price: closePrice,
+                                color: '#f59e0b',
+                                lineWidth: 1,
+                                lineStyle: 2,
+                                axisLabelVisible: true,
+                                title: '平仓价'
+                            });
+                        }
+
+                        // v5 API：用 createSeriesMarkers 替代已废弃的 setMarkers
+                        if (markers.length > 0) {
+                            markers.sort((a, b) => a.time - b.time);
+                            window._seriesMarkers = LightweightCharts.createSeriesMarkers(candleSeries, markers);
+                        }
+
+                        setTimeout(() => chartInstance.timeScale().fitContent(), 100);
+                    } catch (markerErr) {
+                        console.error('Marker Injection Error:', markerErr);
+                    }
+                    
+                    document.getElementById('chart-subtitle').innerText = "行情同步完成 | " + side;
+                })
+                .catch(err => {
+                    clearTimeout(timeoutId);
+                    if (err.name === 'AbortError') {
+                        document.getElementById('chart-subtitle').innerText = "获取 Binance 数据超时 (可能被防火墙拦截)";
+                    } else {
+                        document.getElementById('chart-subtitle').innerText = "加载图表时发生网络跨域拦截错误";
+                    }
+                    console.error("Fetch Error:", err);
+                });
+        }
+
+        // Init
+        connectWS();
+    </script>
+</body>
+</html>
