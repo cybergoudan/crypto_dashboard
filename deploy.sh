@@ -12,6 +12,12 @@ BINARY="crypto_dashboard"
 PORT=28964
 GITHUB_RAW="https://raw.githubusercontent.com/cybergoudan/crypto_dashboard/main"
 
+# 防止 Windows CRLF 污染变量
+APP_DIR="${APP_DIR//$'\r'/}"
+SERVICE_NAME="${SERVICE_NAME//$'\r'/}"
+BINARY="${BINARY//$'\r'/}"
+GITHUB_RAW="${GITHUB_RAW//$'\r'/}"
+
 echo ""
 echo "======================================================"
 echo "  币安量化仪表盘 部署脚本"
